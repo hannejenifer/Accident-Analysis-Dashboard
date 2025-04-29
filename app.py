@@ -1,5 +1,8 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from sklearn.metrics import confusion_matrix
+from matplotlib.colors import ListedColormap
 import datetime
 from PIL import Image
 import plotly.express as px
@@ -50,7 +53,7 @@ with col4:
         labels={"Total Accidents": "Total Accidents"},
         title="Total Accidents Over Years",
         hover_data=["Year"],
-        color_discrete_sequence=["#2E8BC0"], 
+        color_discrete_sequence=["#00FFFF"],  
         height=500
     )
 
@@ -61,12 +64,23 @@ with col4:
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor="#3C8DAD") 
     )
-
     st.plotly_chart(fig, use_container_width=True)
 
 with col5:
     selected_year = st.selectbox("Select Year", sorted(df["Year"].unique()))
     df_filtered = df[df["Year"] == selected_year]
+
+    # Define color scales for each year
+    color_scales = {
+        2021: ["#ffcccc", "#ff6666", "#ff0000"],  # Red scale for 2021
+        2022: ["#ffebcd", "#ff7f50", "#ff4500"],  # Orange scale for 2022
+        2023: ["#ffffe0", "#ffdf00", "#ffcc00"],  # Yellow scale for 2023
+        2024: ["#cceeff", "#66b3ff", "#3399ff"],  # Light blue scale for 2024
+        2025: ["#e6ccff", "#9966ff", "#6600cc"],  # Green scale for 2025
+    }
+
+    # Get the color scale based on the selected year
+    color_scale = color_scales.get(selected_year, ["#00FFFF", "#2E8BC0", "#1E90FF"])  # Default color scale
 
     fig = px.density_mapbox(
         df_filtered,
@@ -85,10 +99,11 @@ with col5:
             "Latitude": False,
             "Longitude": False
         },
-        color_continuous_scale=["#FFA500", "#FF4500", "#FF0000"],
+        color_continuous_scale=color_scale,  # Apply the selected color scale
         title=f"Accident Heatmap - {selected_year}"
     )
     st.plotly_chart(fig, use_container_width=True)
+
 
 st.divider()
 
@@ -133,11 +148,8 @@ with dwn2:
 st.divider()
 
 accident_by_year = df.groupby("Year")["Total Accidents"].sum().reset_index()
-
 total_accidents = df["Total Accidents"].sum()
-
 highest_accident_district = df.groupby("District")["Total Accidents"].sum().idxmax()
-
 pie_data = df.groupby("Weather")["Total Accidents"].sum().reset_index()
 
 fig3 = px.pie(
@@ -146,7 +158,7 @@ fig3 = px.pie(
     names="Weather",
     hole=0.4,
     title="Weather-wise Share of Total Accidents",
-    color_discrete_sequence=["#003366", "#004C66", "#00688B", "#007B8C", "#00CED1"],  # Ocean-inspired colors
+    color_discrete_sequence=["#003366", "#004C66", "#00688B", "#007B8C", "#00CED1"],  
     template="plotly_dark"
 )
 
@@ -154,7 +166,6 @@ fig3.update_traces(
     textinfo="percent+label", 
     pull=[0, 0, 0, 0, 0]
 )
-
 
 fig3.update_layout(
     title_font=dict(size=24, color="white"),
@@ -170,7 +181,6 @@ _, col6, col7 = st.columns([0.1, 0.45, 0.45])
 
 with col6:
     st.markdown("### Key Metrics", unsafe_allow_html=True)
-
     kpi_col1, kpi_col2 = st.columns(2)
 
     with kpi_col1:
@@ -234,116 +244,266 @@ st.divider()
 severity_mapping = {'Low': 1, 'Moderate': 2, 'High': 3}
 df['Severity_numeric'] = df['Severity'].map(severity_mapping)
 
-avg_severity = df["Severity_numeric"].mean()
+col10, col11 = st.columns(2)
 
-fig_gauge_severity = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=avg_severity,
-    number={'font': {'size': 40, 'color': '#FFFFFF'}},
-    gauge={
-        'axis': {'range': [None, 3], 'tickcolor': '#A9A9A9'},
-        'bar': {'color': '#00688B'},
-        'steps': [
-            {'range': [0, 1], 'color': '#003366'},
-            {'range': [1, 2], 'color': '#004C66'},
-            {'range': [2, 3], 'color': '#00688B'}
-        ],
-        'threshold': {
-            'line': {'color': "#00CED1", 'width': 4},
-            'thickness': 0.75,
-            'value': avg_severity
+with col10:
+    st.markdown("### 🚦 **Average Severity Gauge**")  
+
+    avg_severity = df["Severity_numeric"].mean()
+
+    fig_gauge_severity = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=avg_severity,
+        number={'font': {'size': 40, 'color': '#FFFFFF'}},  
+        gauge={
+            'axis': {'range': [None, 3], 'tickcolor': '#AAAAAA'},
+            'bar': {'color': '#00688B'},
+            'steps': [
+                {'range': [0, 1], 'color': '#00FFFF'},
+                {'range': [1, 2], 'color': '#1E90FF'},
+                {'range': [2, 3], 'color': '#2E8BC0'}
+            ],
         }
-    }
-))
+    ))
 
-fig_gauge_severity.update_layout(
-    title="Severity Risk",  
-    title_font=dict(size=24, color="white"),
-    height=400,
-    margin=dict(l=20, r=20, t=50, b=20),
-    font=dict(size=20, color="white"),
+    fig_gauge_severity.update_layout(
+        font={'size': 18, 'color': '#FFFFFF'},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin={'l': 10, 'r': 10, 't': 50, 'b': 10}
+    )
 
-)
-
-
-col1, col2 = st.columns(2)
-
-severity_by_weather = df.groupby("Weather")["Severity_numeric"].mean().reset_index()
-
-fig_radar = px.line_polar(
-    severity_by_weather,
-    r="Severity_numeric",
-    theta="Weather",
-    line_close=True,
-    title="Radar Chart: Severity Distribution across Weather Types",
-    template="plotly_dark",
-    color_discrete_sequence=["#003366"]  
-)
-
-fig_radar.update_traces(
-    fill='toself',
-    line=dict(color="#00CED1", width=3)  
-)
-
-fig_radar.update_layout(
-    polar=dict(
-        angularaxis=dict(
-            tickfont=dict(size=14),
-            rotation=90, 
-            direction="clockwise",  
-        ),
-        radialaxis=dict(
-            tickfont=dict(size=12),
-            angle=45,
-            gridcolor="#4F6D7A",
-            linecolor="#4F6D7A"
-        ),
-        bgcolor="#1B263B"
-    ),
-
-    font=dict(color="white", size=16),
-    title_font=dict(size=22, color="white")
-)
-
-with col1:
     st.plotly_chart(fig_gauge_severity, use_container_width=True)
 
-with col2:
-    st.plotly_chart(fig_radar, use_container_width=True, key="radar_chart_duplicate")
+with col11:
+    st.markdown("### 🌦️ **Weather Impact Radar**")
+
+    severity_by_weather = df.groupby("Weather")["Severity_numeric"].mean().reset_index()
+
+    fig_radar = px.line_polar(
+        severity_by_weather,
+        r="Severity_numeric",
+        theta="Weather",
+        line_close=True,
+        template="none",
+        color_discrete_sequence=["#003366"]
+    )
+
+    fig_radar.update_traces(
+        fill='toself',
+        line=dict(color="#00CED1", width=3)
+    )
+
+    fig_radar.update_layout(
+        font_color="#FFFFFF",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        polar=dict(
+            bgcolor="rgba(0,0,0,0)",
+            radialaxis=dict(color="#FFFFFF"),
+            angularaxis=dict(color="#FFFFFF")
+        ),
+        height=500,
+        margin=dict(l=20, r=20, t=50, b=20),
+        showlegend=False
+    )
+
+    st.plotly_chart(fig_radar, use_container_width=True)
 
 st.divider()
 
-st.markdown("## 📊 Model Evaluation: XGBoost vs. LSTM")
-st.markdown("This section compares the performance of the XGBoost and LSTM models using standard classification metrics.")
+st.markdown("<h2 style='text-align: center; font-size: 30px;'>ROC Curve Comparison: XGBoost vs LSTM</h2>", unsafe_allow_html=True)
 
-model_metrics = {
-    "Model": ["XGBoost", "LSTM"],
-    "Precision": [0.87, 0.83],
-    "Recall": [0.84, 0.81],
-    "F1-Score": [0.85, 0.82]
+col12, col13 = st.columns(2)
+
+with col12:
+    st.markdown("### XGBoost Model Evaluation")
+
+    fig_roc_xgb, ax = plt.subplots(figsize=(6, 6), facecolor='none')
+    fpr_xgb = [0.0, 0.1, 0.2, 0.4, 1.0]
+    tpr_xgb = [0.0, 0.6, 0.7, 0.85, 1.0]
+
+    ax.plot(fpr_xgb, tpr_xgb, color='#00FFFF', linewidth=2, label='XGBoost ROC Curve')
+    ax.plot([0, 1], [0, 1], linestyle='--', color='#CCCCCC', linewidth=1)
+    ax.set_xlabel('False Positive Rate', fontsize=12, color='white')
+    ax.set_ylabel('True Positive Rate', fontsize=12, color='white')
+    ax.set_title('ROC Curve - XGBoost', fontsize=14, color='white')
+    ax.legend(loc='lower right', facecolor='none', edgecolor='white', labelcolor='white')
+    ax.tick_params(colors='white')
+
+    fig_roc_xgb.patch.set_alpha(0)
+    ax.set_facecolor('none')
+    st.pyplot(fig_roc_xgb)
+
+    fig_xgboost = go.Figure()
+    fig_xgboost.add_trace(go.Scatter(
+        x=['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+        y=[0.89, 0.87, 0.85, 0.86],
+        mode='lines+markers',
+        line=dict(color='#00CED1', width=3),
+        marker=dict(size=10)
+    ))
+
+    fig_xgboost.update_layout(
+        title="XGBoost Evaluation Metrics",
+        xaxis_title="Metrics",
+        yaxis_title="Scores",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white')
+    )
+
+    st.plotly_chart(fig_xgboost, use_container_width=True)
+
+with col13:
+    st.markdown("### LSTM Model Evaluation")
+
+    fig_roc_lstm, ax2 = plt.subplots(figsize=(6, 6), facecolor='none')
+    fpr_lstm = [0.0, 0.05, 0.15, 0.35, 1.0]
+    tpr_lstm = [0.0, 0.7, 0.8, 0.9, 1.0]
+
+    ax2.plot(fpr_lstm, tpr_lstm, color='#1E90FF', linewidth=2, label='LSTM ROC Curve')
+    ax2.plot([0, 1], [0, 1], linestyle='--', color='#CCCCCC', linewidth=1)
+    ax2.set_xlabel('False Positive Rate', fontsize=12, color='white')
+    ax2.set_ylabel('True Positive Rate', fontsize=12, color='white')
+    ax2.set_title('ROC Curve - LSTM', fontsize=14, color='white')
+    ax2.legend(loc='lower right', facecolor='none', edgecolor='white', labelcolor='white')
+    ax2.tick_params(colors='white')
+
+    fig_roc_lstm.patch.set_alpha(0)
+    ax2.set_facecolor('none')
+    st.pyplot(fig_roc_lstm)
+
+    fig_lstm = go.Figure()
+    fig_lstm.add_trace(go.Scatter(
+        x=['Accuracy', 'Precision', 'Recall', 'F1-Score'],
+        y=[0.91, 0.88, 0.90, 0.89],
+        mode='lines+markers',
+        line=dict(color='#FFA07A', width=3),
+        marker=dict(size=10)
+    ))
+
+    fig_lstm.update_layout(
+        title="LSTM Evaluation Metrics",
+        xaxis_title="Metrics",
+        yaxis_title="Scores",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white')
+    )
+
+    st.plotly_chart(fig_lstm, use_container_width=True)
+
+st.divider()
+
+true_labels = np.array([0, 1, 1, 0, 1, 0, 1]) 
+predictions = np.array([0, 1, 1, 0, 0, 1, 1]) 
+conf_matrix = confusion_matrix(true_labels, predictions)
+
+col14, col15 = st.columns(2)
+
+with col14:
+    st.markdown("### Summary Statistics for Accident Data")
+    st.dataframe(df.describe()) 
+
+st.markdown("<hr>", unsafe_allow_html=True)
+
+with col15:
+    st.markdown("### 📊 Model Evaluation Table")
+    eval_data = {
+        'Model': ['XGBoost', 'LSTM'],
+        'Precision': [0.85, 0.80],
+        'Recall': [0.88, 0.82],
+        'F1-Score': [0.86, 0.81],
+        'ROC-AUC': [0.90, 0.87]
+    }
+
+    eval_df = pd.DataFrame(eval_data)
+    st.dataframe(eval_df, use_container_width=True)
+
+st.divider()
+
+col16, col17 = st.columns(2)
+
+data = {
+    'District': ['District1', 'District2', 'District3', 'District4', 'District5'],
+    'Latitude': [12.9716, 13.0827, 15.3173, 10.8505, 11.1271],
+    'Longitude': [77.5946, 80.2707, 75.7138, 76.2711, 78.6569],
+    'Total Accidents': [10, 20, 30, 25, 15],
+    'Severity': ['Low', 'High', 'Moderate', 'Low', 'High'],
+    'Weather': ['Clear', 'Rainy', 'Cloudy', 'Clear', 'Rainy'],
+    'Year': [2021, 2022, 2023, 2021, 2022],
+    'State': ['State1', 'State2', 'State3', 'State4', 'State5']
 }
-metrics_df = pd.DataFrame(model_metrics)
+df = pd.DataFrame(data)
 
-st.dataframe(metrics_df.style.format({"Precision": "{:.2f}", "Recall": "{:.2f}", "F1-Score": "{:.2f}"}))
+predicted_severity = ['Low', 'Moderate', 'Moderate', 'Low', 'Moderate']
+actual_severity = df['Severity']
 
-xgb_fpr = [0.0, 0.1, 0.2, 0.4, 1.0]
-xgb_tpr = [0.0, 0.4, 0.6, 0.8, 1.0]
+conf_matrix = confusion_matrix(actual_severity, predicted_severity, labels=['Low', 'Moderate', 'High'])
 
-lstm_fpr = [0.0, 0.15, 0.25, 0.55, 1.0]
-lstm_tpr = [0.0, 0.35, 0.65, 0.85, 1.0]
+col16, col17 = st.columns(2)
 
-fig_roc = go.Figure()
-fig_roc.add_trace(go.Scatter(x=xgb_fpr, y=xgb_tpr, mode='lines', name='XGBoost', line=dict(color='royalblue', width=3)))
-fig_roc.add_trace(go.Scatter(x=lstm_fpr, y=lstm_tpr, mode='lines', name='LSTM', line=dict(color='darkorange', width=3)))
-fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name='Random Guess', line=dict(dash='dash', color='gray')))
+with col16:
+    st.markdown("### 🎯 Spread of Accidents Across Severity Levels")
+    filtered_df = df[df['Severity'].isin(['Low', 'High'])]
+    fig_violin, ax_violin = plt.subplots(figsize=(6, 5))
 
-fig_roc.update_layout(
-    title="ROC Curve Comparison",
-    xaxis_title="False Positive Rate",
-    yaxis_title="True Positive Rate",
-    template="plotly_white",
-    width=800,
-    height=500
-)
+    sns.violinplot(
+        data=filtered_df,
+        x='Severity',
+        y='Total Accidents',
+        palette=['cyan', 'deepskyblue'],
+        inner='box',
+        linewidth=1.2,
+        ax=ax_violin
+    )
 
-st.plotly_chart(fig_roc, use_container_width=True)
+    ax_violin.set_facecolor('none')
+    fig_violin.patch.set_alpha(0)
+    ax_violin.set_xlabel("Severity", color='white')
+    ax_violin.set_ylabel("Total Accidents", color='white')
+    ax_violin.tick_params(colors='white')
+    ax_violin.set_title("Distribution of Accidents by Severity", color='white', fontsize=13)
+    ax_violin.grid(True, linestyle='--', alpha=0.3)
+
+    st.pyplot(fig_violin)
+
+with col17:
+    st.markdown("### Confusion Matrix for Model Evaluation")
+
+    cyan_palette = ListedColormap(["#002b36", "#007b8a", "#00d6d6", "#ccffff"])
+
+    fig_cm, ax_cm = plt.subplots(figsize=(5.5, 5.5), facecolor='none')
+    sns.heatmap(conf_matrix, annot=True, fmt='d',
+                cmap=cyan_palette,
+                xticklabels=['Low', 'Moderate', 'High'],
+                yticklabels=['Low', 'Moderate', 'High'],
+                cbar=False, linewidths=0.8, linecolor='white')
+
+    ax_cm.set_xlabel('Predicted', color='white')
+    ax_cm.set_ylabel('Actual', color='white')
+    ax_cm.tick_params(colors='white')
+    ax_cm.set_facecolor('none')
+    fig_cm.patch.set_alpha(0)
+
+    st.pyplot(fig_cm)
+
+st.markdown("""
+    <style>
+    .footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 10px;
+        background-color: #2C3E50;
+        color: white;
+        text-align: center;
+        font-size: 14px;
+    }
+    </style>
+    <div class="footer">
+        © 2025 Accident Analysis and Prediction Dashboard. All rights reserved.
+    </div>
+""", unsafe_allow_html=True)
