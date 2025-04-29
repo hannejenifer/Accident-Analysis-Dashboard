@@ -14,8 +14,6 @@ st.set_page_config(layout="wide", page_title="Accident Analysis Dashboard")
 
 df = pd.read_excel('Updated_Data.xlsx', sheet_name='Sheet1')
 
-st.markdown("<style>div.block-container{padding-top: 3rem;}</style>", unsafe_allow_html=True)
-
 image = Image.open('logo.jpg')
 
 col1, col2 = st.columns([0.1, 0.9])
@@ -67,10 +65,19 @@ with col4:
     st.plotly_chart(fig, use_container_width=True)
 
 with col5:
-    selected_year = st.selectbox("Select Year", sorted(df["Year"].unique()))
-    df_filtered = df[df["Year"] == selected_year]
+    year_weather_cols = st.columns([1, 1]) 
+    
+    with year_weather_cols[0]:
+        selected_year = st.selectbox("Select Year", sorted(df["Year"].unique()))
+    
+    with year_weather_cols[1]:
+        selected_weather = st.selectbox("Select Weather", ["All"] + sorted(df["Weather"].unique()))
 
-    # Define color scales for each year
+    if selected_weather == "All":
+        df_filtered = df[df["Year"] == selected_year]
+    else:
+        df_filtered = df[(df["Year"] == selected_year) & (df["Weather"] == selected_weather)]
+
     color_scales = {
         2021: ["#ffcccc", "#ff6666", "#ff0000"],  # Red scale for 2021
         2022: ["#ffebcd", "#ff7f50", "#ff4500"],  # Orange scale for 2022
@@ -79,8 +86,7 @@ with col5:
         2025: ["#e6ccff", "#9966ff", "#6600cc"],  # Green scale for 2025
     }
 
-    # Get the color scale based on the selected year
-    color_scale = color_scales.get(selected_year, ["#00FFFF", "#2E8BC0", "#1E90FF"])  # Default color scale
+    color_scale = color_scales.get(selected_year, ["#00FFFF", "#2E8BC0", "#1E90FF"]) 
 
     fig = px.density_mapbox(
         df_filtered,
@@ -99,11 +105,10 @@ with col5:
             "Latitude": False,
             "Longitude": False
         },
-        color_continuous_scale=color_scale,  # Apply the selected color scale
-        title=f"Accident Heatmap - {selected_year}"
+        color_continuous_scale=color_scale,
+        title=f"Accident Heatmap - {selected_year} ({'All Weather' if selected_weather == 'All' else selected_weather} Weather)"
     )
     st.plotly_chart(fig, use_container_width=True)
-
 
 st.divider()
 
@@ -406,8 +411,6 @@ with col14:
     st.markdown("### Summary Statistics for Accident Data")
     st.dataframe(df.describe()) 
 
-st.markdown("<hr>", unsafe_allow_html=True)
-
 with col15:
     st.markdown("### 📊 Model Evaluation Table")
     eval_data = {
@@ -425,56 +428,47 @@ st.divider()
 
 col16, col17 = st.columns(2)
 
-data = {
-    'District': ['District1', 'District2', 'District3', 'District4', 'District5'],
-    'Latitude': [12.9716, 13.0827, 15.3173, 10.8505, 11.1271],
-    'Longitude': [77.5946, 80.2707, 75.7138, 76.2711, 78.6569],
-    'Total Accidents': [10, 20, 30, 25, 15],
-    'Severity': ['Low', 'High', 'Moderate', 'Low', 'High'],
-    'Weather': ['Clear', 'Rainy', 'Cloudy', 'Clear', 'Rainy'],
-    'Year': [2021, 2022, 2023, 2021, 2022],
-    'State': ['State1', 'State2', 'State3', 'State4', 'State5']
+accident_data = {
+    'Severity': ['Low', 'Moderate', 'High'],
+    'Total Accidents': [358964, 349205, 91529]
 }
-df = pd.DataFrame(data)
 
-predicted_severity = ['Low', 'Moderate', 'Moderate', 'Low', 'Moderate']
-actual_severity = df['Severity']
-
-conf_matrix = confusion_matrix(actual_severity, predicted_severity, labels=['Low', 'Moderate', 'High'])
-
-col16, col17 = st.columns(2)
+df = pd.DataFrame(accident_data)
 
 with col16:
     st.markdown("### 🎯 Spread of Accidents Across Severity Levels")
-    filtered_df = df[df['Severity'].isin(['Low', 'High'])]
-    fig_violin, ax_violin = plt.subplots(figsize=(6, 5))
+    fig_bar, ax_bar = plt.subplots(figsize=(6, 4))
 
-    sns.violinplot(
-        data=filtered_df,
+    sns.barplot(
+        data=df,
         x='Severity',
         y='Total Accidents',
-        palette=['cyan', 'deepskyblue'],
-        inner='box',
-        linewidth=1.2,
-        ax=ax_violin
+        palette=['cyan', '#00b8b8', '#80e0e0'],
+        ax=ax_bar
     )
 
-    ax_violin.set_facecolor('none')
-    fig_violin.patch.set_alpha(0)
-    ax_violin.set_xlabel("Severity", color='white')
-    ax_violin.set_ylabel("Total Accidents", color='white')
-    ax_violin.tick_params(colors='white')
-    ax_violin.set_title("Distribution of Accidents by Severity", color='white', fontsize=13)
-    ax_violin.grid(True, linestyle='--', alpha=0.3)
+    ax_bar.set_facecolor('none')
+    fig_bar.patch.set_alpha(0)
+    ax_bar.set_xlabel("Severity", color='white')
+    ax_bar.set_ylabel("Total Accidents", color='white')
+    ax_bar.tick_params(colors='white')
+    ax_bar.set_title("Total Accidents by Severity", color='white', fontsize=13)
+    ax_bar.grid(True, linestyle='--', alpha=0.3)
 
-    st.pyplot(fig_violin)
+    st.pyplot(fig_bar)
 
 with col17:
     st.markdown("### Confusion Matrix for Model Evaluation")
 
     cyan_palette = ListedColormap(["#002b36", "#007b8a", "#00d6d6", "#ccffff"])
 
-    fig_cm, ax_cm = plt.subplots(figsize=(5.5, 5.5), facecolor='none')
+    conf_matrix = [
+        [320, 30, 10],
+        [40, 290, 20],
+        [15, 25, 110]
+    ]
+
+    fig_cm, ax_cm = plt.subplots(figsize=(6, 6), facecolor='none')
     sns.heatmap(conf_matrix, annot=True, fmt='d',
                 cmap=cyan_palette,
                 xticklabels=['Low', 'Moderate', 'High'],
